@@ -74,7 +74,7 @@ export default function PricingTeaser() {
   }, []);
 
   return (
-    <section id="pricing" className="scroll-mt-20 py-20 lg:py-28">
+    <section id="pricing" className="scroll-mt-20 py-14 lg:py-20">
       <div className="mx-auto max-w-[1200px] px-4 sm:px-6">
         <Reveal className="mx-auto max-w-2xl text-center">
           <p className="text-[14px] font-semibold uppercase tracking-[0.14em] text-brand-600">Pricing</p>
@@ -87,9 +87,9 @@ export default function PricingTeaser() {
           </p>
         </Reveal>
 
-        <div className="mt-14 grid gap-5 lg:grid-cols-3">
+        <div className="mt-10 grid gap-5 lg:grid-cols-3">
           {plans.map((plan, index) => {
-            const featured = !!plan.isPopular;
+            const featured = !!plan.isPopular || plan.slug === "pro";
             const monthly = plan.pricing?.monthly ?? 0;
             return (
               <Reveal

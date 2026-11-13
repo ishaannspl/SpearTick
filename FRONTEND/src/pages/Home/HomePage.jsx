@@ -3,6 +3,7 @@ import { MotionConfig } from "framer-motion";
 import SiteHeader from "../../components/home/SiteHeader";
 import Hero from "../../components/home/Hero";
 import Features, { TrustStrip } from "../../components/home/Features";
+import UseCases from "../../components/home/UseCases";
 import HowItWorks from "../../components/home/HowItWorks";
 import PricingTeaser from "../../components/home/PricingTeaser";
 import Faq from "../../components/home/Faq";
@@ -22,6 +23,7 @@ export default function HomePage() {
           <Hero />
           <TrustStrip />
           <Features />
+          <UseCases />
           <HowItWorks />
           <PricingTeaser />
           <Faq />

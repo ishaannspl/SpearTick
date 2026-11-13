@@ -23,8 +23,8 @@ const TRUST_POINTS = [
 
 export function TrustStrip() {
   return (
-    <section className="border-y border-line bg-surface">
-      <ul className="mx-auto grid max-w-[1200px] grid-cols-2 gap-x-6 gap-y-5 px-4 py-7 sm:px-6 md:grid-cols-4">
+    <section className="border-b border-line bg-surface">
+      <ul className="mx-auto grid max-w-[1200px] grid-cols-2 gap-x-6 gap-y-4 px-4 py-5 sm:px-6 md:grid-cols-4">
         {TRUST_POINTS.map(({ icon: Icon, label }) => (
           <li key={label} className="flex items-center gap-3 text-[15px] font-medium text-ink">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700">
@@ -72,6 +72,14 @@ const SPOTLIGHTS = [
   },
 ];
 
+const PANEL_TINTS = [
+  "bg-gradient-to-br from-[#ddf5e8] to-[#c3ebd5]",
+  "bg-gradient-to-br from-[#e3f0fb] to-[#c9e1f5]",
+  "bg-gradient-to-br from-[#fff1d6] to-[#fbe2ae]",
+];
+
+const CARD_TINTS = ["bg-[#ddf5e8]", "bg-[#e3f0fb]", "bg-[#fff1d6]"];
+
 const MORE_FEATURES = [
   {
     icon: Bot,
@@ -107,7 +115,7 @@ const MORE_FEATURES = [
 
 export default function Features() {
   return (
-    <section id="features" className="scroll-mt-20 py-20 lg:py-28">
+    <section id="features" className="scroll-mt-20 py-14 lg:py-20">
       <div className="mx-auto max-w-[1200px] px-4 sm:px-6">
         <Reveal className="mx-auto max-w-2xl text-center">
           <p className="text-[14px] font-semibold uppercase tracking-[0.14em] text-brand-600">Everything in one place</p>
@@ -116,7 +124,7 @@ export default function Features() {
           </h2>
         </Reveal>
 
-        <div className="mt-16 space-y-20 lg:mt-20 lg:space-y-28">
+        <div className="mt-12 space-y-12 lg:mt-14 lg:space-y-16">
           {SPOTLIGHTS.map((feature, index) => (
             <div key={feature.title} className="grid items-center gap-10 lg:grid-cols-2 lg:gap-16">
               <Reveal className={index % 2 === 1 ? "lg:order-2" : undefined}>
@@ -137,20 +145,20 @@ export default function Features() {
                 </ul>
               </Reveal>
               <Reveal delay={0.1} className={index % 2 === 1 ? "lg:order-1" : undefined}>
-                <div className="rounded-[28px] bg-gradient-to-br from-brand-50 to-[#f4f9ec] p-4 sm:p-8">{feature.visual}</div>
+                <div className={`rounded-[28px] p-4 sm:p-8 ${PANEL_TINTS[index % PANEL_TINTS.length]}`}>{feature.visual}</div>
               </Reveal>
             </div>
           ))}
         </div>
 
-        <div className="mt-24 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-14 grid gap-4 sm:grid-cols-2 lg:mt-16 lg:grid-cols-3">
           {MORE_FEATURES.map(({ icon: Icon, title, body }, index) => (
             <Reveal
               key={title}
               delay={(index % 3) * 0.06}
               className="rounded-2xl border border-line bg-surface p-6 transition-shadow hover:shadow-[var(--shadow-pop)]"
             >
-              <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-900 text-accent">
+              <span className={`flex h-11 w-11 items-center justify-center rounded-xl text-brand-900 ${CARD_TINTS[index % CARD_TINTS.length]}`}>
                 <Icon size={20} />
               </span>
               <h3 className="mt-5 text-[19px] font-semibold text-ink">{title}</h3>

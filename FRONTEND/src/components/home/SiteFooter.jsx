@@ -1,10 +1,11 @@
 import { Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 import Logo from "../ui/Logo";
+import { hasSupportContact, supportEmailUrl, supportWhatsAppUrl } from "../../utils/support";
 
 export function CtaBand() {
   return (
-    <section className="px-4 py-20 sm:px-6 lg:py-24">
+    <section className="px-4 py-14 sm:px-6 lg:py-20">
       <div className="relative mx-auto max-w-[1200px] overflow-hidden rounded-[32px] bg-brand-900 px-6 py-14 text-center sm:px-12 sm:py-20">
         <div aria-hidden="true" className="pointer-events-none absolute inset-0">
           <div className="absolute -left-24 -top-24 h-72 w-72 rounded-full bg-brand-600/40 blur-3xl" />
@@ -65,26 +66,40 @@ const FOOTER_LINKS = [
 
 export default function SiteFooter() {
   return (
-    <footer className="border-t border-line bg-surface">
+    <footer className="bg-brand-950 text-white">
       <div className="mx-auto grid max-w-[1200px] grid-cols-2 gap-10 px-4 py-14 sm:px-6 md:grid-cols-[1.4fr_repeat(3,1fr)]">
         <div className="col-span-2 md:col-span-1">
-          <Logo />
-          <p className="mt-4 max-w-xs text-[15px] leading-relaxed text-ink-muted">
+          <Logo inverted />
+          <p className="mt-4 max-w-xs text-[15px] leading-relaxed text-white/70">
             WhatsApp campaigns, shared inbox and AI replies for growing shops and businesses.
           </p>
+          {hasSupportContact && (
+            <div className="mt-5 flex flex-wrap gap-2.5 text-[14px] font-medium">
+              {supportWhatsAppUrl() && (
+                <a href={supportWhatsAppUrl()} target="_blank" rel="noreferrer" className="rounded-lg bg-accent px-3.5 py-2 text-brand-900 hover:bg-[#b9e650]">
+                  Chat on WhatsApp
+                </a>
+              )}
+              {supportEmailUrl && (
+                <a href={supportEmailUrl} className="rounded-lg border border-white/25 px-3.5 py-2 text-white hover:bg-white/10">
+                  Email us
+                </a>
+              )}
+            </div>
+          )}
         </div>
         {FOOTER_LINKS.map((group) => (
           <div key={group.title}>
-            <p className="font-display text-[15px] font-semibold text-ink">{group.title}</p>
+            <p className="font-display text-[15px] font-semibold text-white">{group.title}</p>
             <ul className="mt-4 space-y-2.5">
               {group.links.map((link) => (
                 <li key={link.label}>
                   {link.to ? (
-                    <Link to={link.to} className="text-[15px] text-ink-muted transition-colors hover:text-brand-800">
+                    <Link to={link.to} className="text-[15px] text-white/70 transition-colors hover:text-accent">
                       {link.label}
                     </Link>
                   ) : (
-                    <a href={link.href} className="text-[15px] text-ink-muted transition-colors hover:text-brand-800">
+                    <a href={link.href} className="text-[15px] text-white/70 transition-colors hover:text-accent">
                       {link.label}
                     </a>
                   )}
@@ -94,8 +109,8 @@ export default function SiteFooter() {
           </div>
         ))}
       </div>
-      <div className="border-t border-line">
-        <div className="mx-auto flex max-w-[1200px] flex-col gap-2 px-4 py-6 text-[14px] text-ink-muted sm:flex-row sm:justify-between sm:px-6">
+      <div className="border-t border-white/10">
+        <div className="mx-auto flex max-w-[1200px] flex-col gap-2 px-4 py-6 text-[14px] text-white/60 sm:flex-row sm:justify-between sm:px-6">
           <p>© {new Date().getFullYear()} SpearTick. All rights reserved.</p>
           <p>WhatsApp is a trademark of Meta Platforms, Inc.</p>
         </div>

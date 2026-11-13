@@ -69,24 +69,24 @@ const STEPS = [
 
 export default function HowItWorks() {
   return (
-    <section id="how-it-works" className="scroll-mt-20 bg-surface py-20 lg:py-28">
+    <section id="how-it-works" className="scroll-mt-20 bg-brand-900 py-14 text-white lg:py-20">
       <div className="mx-auto max-w-[1200px] px-4 sm:px-6">
         <Reveal className="mx-auto max-w-2xl text-center">
-          <p className="text-[14px] font-semibold uppercase tracking-[0.14em] text-brand-600">How it works</p>
-          <h2 className="mt-3 text-[32px] font-semibold tracking-[-0.02em] text-brand-950 sm:text-[44px]">
+          <p className="text-[14px] font-semibold uppercase tracking-[0.14em] text-accent">How it works</p>
+          <h2 className="mt-3 text-[32px] font-semibold tracking-[-0.02em] text-white sm:text-[44px]">
             Up and running in three steps
           </h2>
         </Reveal>
 
-        <ol className="mt-14 grid gap-5 md:grid-cols-3">
+        <ol className="mt-10 grid gap-5 md:grid-cols-3">
           {STEPS.map((step, index) => (
-            <Reveal as="li" key={step.title} delay={index * 0.08} className="relative rounded-3xl border border-line bg-canvas p-6 sm:p-7">
+            <Reveal as="li" key={step.title} delay={index * 0.08} className="relative rounded-3xl border border-white/10 bg-white/[0.07] p-6 sm:p-7">
               <div className="h-[120px] rounded-2xl bg-surface p-2">{step.art}</div>
               <span className="mt-6 inline-flex h-8 w-8 items-center justify-center rounded-full bg-accent font-display text-[15px] font-semibold text-brand-950">
                 {index + 1}
               </span>
-              <h3 className="mt-3 text-[20px] font-semibold text-ink">{step.title}</h3>
-              <p className="mt-2 text-[16px] leading-relaxed text-ink-muted">{step.body}</p>
+              <h3 className="mt-3 text-[20px] font-semibold text-white">{step.title}</h3>
+              <p className="mt-2 text-[16px] leading-relaxed text-white/75">{step.body}</p>
             </Reveal>
           ))}
         </ol>
