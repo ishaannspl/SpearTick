@@ -165,7 +165,7 @@ const KPI_TONES = {
   neutral: { card: "bg-surface border-line", icon: "text-brand-600" },
 };
 
-function KpiCard({ label, value, caption, icon: Icon, onClick, tone = "neutral" }) {
+function KpiCard({ label, value, caption, icon: Icon, onClick, tone = "neutral", className }) {
   const Tag = onClick ? "button" : "div";
   const colors = KPI_TONES[tone] || KPI_TONES.neutral;
   return (
@@ -175,6 +175,7 @@ function KpiCard({ label, value, caption, icon: Icon, onClick, tone = "neutral" 
       className={cn(
         "lift group flex flex-col rounded-[var(--radius-card)] border p-5 text-left shadow-[var(--shadow-card)]",
         colors.card,
+        className,
       )}
     >
       <div className="flex items-center justify-between gap-2">
@@ -495,8 +496,9 @@ function DashboardPage() {
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="min-w-0 space-y-5">
         {/* ── Key numbers ── */}
-        <section className="stagger grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <section className="stagger grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
           <KpiCard
+            className="lg:col-span-2"
             label="Campaigns"
             value={<AnimatedNumber value={stats.totalCampaigns} />}
             caption={`Created in the last ${periodLabel}`}
@@ -505,6 +507,7 @@ function DashboardPage() {
             onClick={() => navigate("/campaigns/history")}
           />
           <KpiCard
+            className="lg:col-span-2"
             label="Delivered"
             value={<AnimatedNumber value={stats.delivered} format={formatNumber} />}
             caption={`${stats.successRate}% of attempted messages`}
@@ -512,6 +515,7 @@ function DashboardPage() {
             tone="blue"
           />
           <KpiCard
+            className="lg:col-span-2"
             label="People reached"
             value={<AnimatedNumber value={stats.audience} format={formatNumber} />}
             caption="Unique contacts messaged"
@@ -519,6 +523,7 @@ function DashboardPage() {
             tone="green"
           />
           <KpiCard
+            className="lg:col-span-3"
             label="Failed"
             value={<AnimatedNumber value={stats.failed} format={formatNumber} />}
             caption={`${stats.failureRate}% of all sends`}
@@ -526,6 +531,7 @@ function DashboardPage() {
             tone={stats.failed > 0 ? "red" : "neutral"}
           />
           <KpiCard
+            className="lg:col-span-3"
             label="WhatsApp spend"
             value={spendValue}
             caption={filter === "all" ? "Billed by Meta, last 365 days" : "Billed by Meta"}
@@ -641,9 +647,8 @@ function DashboardPage() {
         </section>
 
         {/* ── Recent campaigns + attention ── */}
-        <section className="grid gap-5 lg:grid-cols-3">
+        <section className="grid gap-5">
           <SectionCard
-            className="lg:col-span-2"
             title="Recent campaigns"
             action={
               <button
@@ -693,6 +698,74 @@ function DashboardPage() {
             )}
           </SectionCard>
 
+        </section>
+
+        {/* ── Breakdown ── */}
+        <section className="grid gap-5 lg:grid-cols-2">
+          <SectionCard title="Campaign types" description={`Campaigns from the last ${periodLabel}`}>
+            {typeData.length ? (
+              <CountList items={typeData} labelKey="type" />
+            ) : (
+              <Empty title="No campaigns yet" description="Types appear once you've sent campaigns." />
+            )}
+          </SectionCard>
+
+          {segmentationStats && (
+            <SectionCard title="Contacts by tag" description="Your most used tags">
+              {segmentationStats.byTag.length ? (
+                <CountList items={segmentationStats.byTag.slice(0, 6)} labelKey="tag" />
+              ) : (
+                <Empty icon={Users} title="No tags yet" description="Tag contacts to group and target them." />
+              )}
+            </SectionCard>
+          )}
+
+        </section>
+        </div>
+
+        {/* ── Right-hand column ── */}
+        <aside className="min-w-0 space-y-5">
+          <Card padded={false}>
+            <div className="flex items-center gap-3 border-b border-line px-5 py-4">
+              <span className="live-dot flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-50 text-brand-700">
+                <CheckCircle2 size={20} />
+              </span>
+              <div className="min-w-0">
+                <p className="text-[13px] text-ink-muted">WhatsApp</p>
+                <p className="text-[16px] font-semibold text-ink">Connected</p>
+              </div>
+            </div>
+            <div className="divide-y divide-line">
+              <AccountFact label="Quality rating" value={qualityLabel} />
+              <AccountFact label="Messaging limit" value={tierLabel} />
+              <AccountFact
+                label="Campaigns in progress"
+                value={`${stats.running} running`}
+                hint={`${stats.scheduled} scheduled`}
+              />
+            </div>
+          </Card>
+
+          <SectionCard title="Quick shortcuts">
+            <div className="grid grid-cols-2 gap-3">
+              {SHORTCUTS.map((item) => (
+                <button
+                  key={item.label}
+                  type="button"
+                  onClick={() => navigate(item.to)}
+                  className={cn(
+                    "lift flex flex-col items-start gap-2.5 rounded-xl border p-3.5 text-left text-[14px] font-semibold text-ink",
+                    KPI_TONES[item.tone].card,
+                  )}
+                >
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white shadow-sm">
+                    <item.icon size={16} className={KPI_TONES[item.tone].icon} />
+                  </span>
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </SectionCard>
           <SectionCard title="Needs attention">
             <div className="space-y-3">
               {stats.failed > 0 && (
@@ -751,28 +824,6 @@ function DashboardPage() {
               </Button>
             </div>
           </SectionCard>
-        </section>
-
-        {/* ── Breakdown ── */}
-        <section className="grid gap-5 lg:grid-cols-2">
-          <SectionCard title="Campaign types" description={`Campaigns from the last ${periodLabel}`}>
-            {typeData.length ? (
-              <CountList items={typeData} labelKey="type" />
-            ) : (
-              <Empty title="No campaigns yet" description="Types appear once you've sent campaigns." />
-            )}
-          </SectionCard>
-
-          {segmentationStats && (
-            <SectionCard title="Contacts by tag" description="Your most used tags">
-              {segmentationStats.byTag.length ? (
-                <CountList items={segmentationStats.byTag.slice(0, 6)} labelKey="tag" />
-              ) : (
-                <Empty icon={Users} title="No tags yet" description="Tag contacts to group and target them." />
-              )}
-            </SectionCard>
-          )}
-
           {segmentationStats && (
             <SectionCard title="Your audience" description="Where contacts came from and who opted in">
               <div className="grid grid-cols-2 gap-3">
@@ -796,52 +847,6 @@ function DashboardPage() {
               )}
             </SectionCard>
           )}
-        </section>
-        </div>
-
-        {/* ── Right-hand column ── */}
-        <aside className="min-w-0 space-y-5">
-          <Card padded={false}>
-            <div className="flex items-center gap-3 border-b border-line px-5 py-4">
-              <span className="live-dot flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-50 text-brand-700">
-                <CheckCircle2 size={20} />
-              </span>
-              <div className="min-w-0">
-                <p className="text-[13px] text-ink-muted">WhatsApp</p>
-                <p className="text-[16px] font-semibold text-ink">Connected</p>
-              </div>
-            </div>
-            <div className="divide-y divide-line">
-              <AccountFact label="Quality rating" value={qualityLabel} />
-              <AccountFact label="Messaging limit" value={tierLabel} />
-              <AccountFact
-                label="Campaigns in progress"
-                value={`${stats.running} running`}
-                hint={`${stats.scheduled} scheduled`}
-              />
-            </div>
-          </Card>
-
-          <SectionCard title="Quick shortcuts">
-            <div className="grid grid-cols-2 gap-3">
-              {SHORTCUTS.map((item) => (
-                <button
-                  key={item.label}
-                  type="button"
-                  onClick={() => navigate(item.to)}
-                  className={cn(
-                    "lift flex flex-col items-start gap-2.5 rounded-xl border p-3.5 text-left text-[14px] font-semibold text-ink",
-                    KPI_TONES[item.tone].card,
-                  )}
-                >
-                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white shadow-sm">
-                    <item.icon size={16} className={KPI_TONES[item.tone].icon} />
-                  </span>
-                  {item.label}
-                </button>
-              ))}
-            </div>
-          </SectionCard>
         </aside>
         </div>
       </div>
