@@ -1,0 +1,172 @@
+const csv = require("csv-parser");
+const { rowToFields } = require("../utils/sheetFields");
+const fs = require("fs");
+
+const Campaign = require("../models/campaign");
+const Contact = require("../models/contact");
+const Company = require("../models/company");
+const { isCompanyNumber } = require("../utils/whatsappNumberList");
+const { findOrCreateContact } = require("../services/contactService");
+const {
+  scheduleCampaign,
+} = require("../services/campaign/campaignSchedulerService");
+
+const uploadCampaign = async (req, res) => {
+  try {
+    const {
+      campaignName,
+      message,
+      campaignType,
+      scheduleAt,
+      templateId,
+      mediaUrl,
+      mediaType,
+    } = req.body;
+
+    let templateVariables = [];
+    if (req.body.templateVariables) {
+      try {
+        templateVariables = JSON.parse(req.body.templateVariables);
+      } catch {
+        templateVariables = [];
+      }
+    }
+
+    let buttonVariables = [];
+    if (req.body.buttonVariables) {
+      try {
+        buttonVariables = JSON.parse(req.body.buttonVariables);
+      } catch {
+        buttonVariables = [];
+      }
+    }
+
+    if (scheduleAt && req.plan && req.plan.features?.campaignSchedule === false) {
+      return res.status(403).json({
+        success: false,
+        code: "FEATURE_LOCKED",
+        feature: "campaignSchedule",
+        message: "Campaign scheduling is available on Pro and Enterprise plans. Please upgrade to schedule campaigns.",
+      });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: "CSV file is required",
+      });
+    }
+
+    // The WhatsApp number to send from. Must be one of this company's own
+    // numbers; empty means the company's current default, which is pinned
+    // onto the campaign now so a later default change can't redirect it.
+    const company = await Company.findById(req.companyId).select("whatsapp").lean();
+    const requestedNumberId = req.body.phoneNumberId ? String(req.body.phoneNumberId).trim() : "";
+    if (requestedNumberId && !isCompanyNumber(company, requestedNumberId)) {
+      return res.status(400).json({
+        success: false,
+        message: "That WhatsApp number isn't linked to your account",
+      });
+    }
+    const phoneNumberId = requestedNumberId || company?.whatsapp?.phoneNumberId || "";
+
+    const contacts = [];
+
+    const stream = fs.createReadStream(req.file.path);
+
+    stream
+      .pipe(csv())
+      .on("data", (row) => {
+        const fields = rowToFields(row);
+        contacts.push({
+          name: fields.name || "Unknown",
+          phone: fields.phone,
+          fields,
+        });
+      })
+      .on("end", async () => {
+        try {
+          const { companyId } = req;
+
+          const optedOutContacts = await Contact.find({
+            companyId,
+            phone: { $in: contacts.map((c) => c.phone) },
+            optedOut: true,
+          }).select("phone");
+
+          const optedOutPhones = new Set(optedOutContacts.map((c) => c.phone));
+          const eligibleContacts = contacts.filter((c) => !optedOutPhones.has(c.phone));
+          const excludedCount = contacts.length - eligibleContacts.length;
+
+          // Makes every broadcast contribute to the address book too, using
+          // the same name-merge rule as every other contact-creation path —
+          // this must run after the opted-out filter above, never before, so
+          // an opted-out phone can't be re-surfaced as "eligible" by it.
+          await Promise.all(
+            eligibleContacts.map((c) =>
+              findOrCreateContact({ companyId, phone: c.phone, name: c.name, source: "campaign" }),
+            ),
+          );
+
+          const campaign = await Campaign.create({
+            companyId,
+            campaignName,
+            campaignType,
+            phoneNumberId,
+            message,
+            mediaUrl: mediaUrl || "",
+            mediaType: mediaType || "",
+            contacts: eligibleContacts,
+            totalContacts: eligibleContacts.length,
+            scheduleAt: scheduleAt || null,
+            status: scheduleAt ? "scheduled" : "processing",
+            templateId: templateId || null,
+            templateVariables,
+            buttonVariables,
+          });
+
+          await scheduleCampaign({
+            companyId,
+            campaignId: campaign._id,
+            campaignName,
+            contacts: eligibleContacts,
+            message,
+            mediaUrl: mediaUrl || "",
+            mediaType: mediaType || "",
+            campaignType,
+            phoneNumberId,
+            scheduleAt,
+            isScheduled: Boolean(scheduleAt),
+            templateId: templateId || null,
+            templateVariables,
+            buttonVariables,
+          });
+
+          res.status(201).json({
+            success: true,
+            message: "Campaign created successfully",
+            campaign,
+            excludedCount,
+          });
+        } catch (error) {
+          console.log(error);
+
+          res.status(500).json({
+            success: false,
+            message: "Error processing campaign",
+          });
+        }
+      });
+  } catch (error) {
+    console.log(error);
+
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
+};
+
+module.exports = {
+  uploadCampaign,
+};

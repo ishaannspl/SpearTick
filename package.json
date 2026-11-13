@@ -1,0 +1,11 @@
+{
+  "name": "speartick",
+  "version": "1.0.0",
+  "scripts": {
+    "export:figma": "node ../tools/html-to-figma/cli.js --file ./landing-page.html",
+    "export:figma:serve": "node ../tools/html-to-figma/cli.js --file ./landing-page.html --serve"
+  },
+  "dependencies": {
+    "i": "^0.3.7"
+  }
+}

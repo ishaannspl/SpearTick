@@ -1,0 +1,343 @@
+const Company = require("../models/company");
+const Subscription = require("../models/subscription");
+const { resolveSetupStatus, SETUP_STATUS } = require("../utils/setupStatus");
+const {
+  setCompanyWhatsAppCredentials,
+  getCompanyWhatsAppCredentials,
+  updateCompanyMessagingHealth,
+} = require("../services/whatsapp/companyCredentials");
+const {
+  checkWabaHealthStatus,
+} = require("../services/whatsapp/embeddedSignupService");
+const {
+  listCompanyNumbers,
+  syncCompanyNumbers,
+  setDefaultNumber,
+} = require("../services/whatsapp/whatsappNumbers");
+
+function hasEnvWhatsAppCredentials() {
+  return !!(
+    process.env.META_ACCESS_TOKEN &&
+    process.env.META_PHONE_NUMBER_ID &&
+    process.env.META_WABA_ID
+  );
+}
+
+// Never returns the access token itself — only enough to show connection
+// status on the Settings page.
+const getWhatsAppStatus = async (req, res) => {
+  try {
+    const [company, subscription] = await Promise.all([
+      Company.findById(req.companyId).select("whatsapp name setupStatus"),
+      Subscription.findOne({ companyId: req.companyId }),
+    ]);
+
+    if (!company) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Company not found" });
+    }
+
+    const setupStatus = resolveSetupStatus(company, subscription);
+    if (company.setupStatus !== setupStatus) {
+      company.setupStatus = setupStatus;
+      await company.save();
+    }
+
+    const isConnected = company.whatsapp?.connected === true;
+    const whatsappData = {
+      connected: isConnected,
+      phoneNumberId: company.whatsapp?.phoneNumberId || "",
+      isOnBizApp: Boolean(company.whatsapp?.isOnBizApp),
+      wabaId: company.whatsapp?.wabaId || "",
+      tokenType: company.whatsapp?.tokenType || "",
+      connectedAt: company.whatsapp?.connectedAt || null,
+      onboardingCompleted: Boolean(
+        company.whatsapp?.onboardingCompletedAt || isConnected,
+      ),
+      onboardingCompletedAt: company.whatsapp?.onboardingCompletedAt || null,
+      businessId: company.whatsapp?.businessId || "",
+      businessName: company.whatsapp?.businessName || "",
+      messagingBlocked: Boolean(company.whatsapp?.messagingBlocked),
+      messagingStatus: company.whatsapp?.messagingStatus || "",
+      messagingBlockedReason: company.whatsapp?.messagingBlockedReason || "",
+      needsBusinessVerification: Boolean(company.whatsapp?.needsBusinessVerification),
+      healthCheckedAt: company.whatsapp?.healthCheckedAt || null,
+    };
+
+    res.status(200).json({
+      success: true,
+      setupStatus,
+      ...whatsappData,
+      whatsapp: whatsappData,
+    });
+  } catch (error) {
+    console.error("[WhatsApp] Failed to fetch connection status:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch WhatsApp connection status",
+    });
+  }
+};
+
+const getCompanySetupStatus = async (req, res) => {
+  try {
+    const [company, subscription] = await Promise.all([
+      Company.findById(req.companyId).select("name setupStatus whatsapp"),
+      Subscription.findOne({ companyId: req.companyId }),
+    ]);
+
+    if (!company) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Company not found" });
+    }
+
+    const setupStatus = resolveSetupStatus(company, subscription);
+
+    if (company.setupStatus !== setupStatus) {
+      company.setupStatus = setupStatus;
+      await company.save();
+    }
+
+    return res.status(200).json({
+      success: true,
+      setupStatus,
+      hasPlan: Boolean(subscription?.planId),
+      hasWhatsApp: company?.whatsapp?.connected === true,
+      paymentMethodSetup: Boolean(company?.whatsapp?.paymentMethodSetup),
+      messagingBlocked: Boolean(company?.whatsapp?.messagingBlocked),
+    });
+  } catch (error) {
+    console.error("[Company] Failed to fetch setup status:", error);
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to fetch setup status" });
+  }
+};
+
+// Manual "paste your own credentials" connection method — the one every
+// company can use immediately, without waiting on Meta's Embedded Signup
+// (Tech Provider) approval. Stays useful afterward too, for anyone who
+// prefers pasting a long-lived token they manage themselves.
+const connectWhatsApp = async (req, res) => {
+  try {
+    const { accessToken, phoneNumberId, wabaId, apiVersion } = req.body;
+
+    if (!accessToken || !phoneNumberId || !wabaId) {
+      return res.status(400).json({
+        success: false,
+        message: "accessToken, phoneNumberId, and wabaId are all required",
+      });
+    }
+
+    await setCompanyWhatsAppCredentials(req.companyId, {
+      accessToken: accessToken.trim(),
+      phoneNumberId: phoneNumberId.trim(),
+      wabaId: wabaId.trim(),
+      apiVersion: (apiVersion || "v26.0").trim(),
+      tokenType: "manual",
+    });
+
+    res
+      .status(200)
+      .json({ success: true, message: "WhatsApp Business Account connected" });
+  } catch (error) {
+    console.log(error);
+    res
+      .status(500)
+      .json({
+        success: false,
+        message: "Failed to connect WhatsApp Business Account",
+      });
+  }
+};
+
+const disconnectWhatsApp = async (req, res) => {
+  try {
+    const result = await Company.updateOne(
+      { _id: req.companyId },
+      {
+        $set: {
+          setupStatus: SETUP_STATUS.WHATSAPP_ONBOARDING_REQUIRED,
+          "whatsapp.connected": false,
+          "whatsapp.accessToken": "",
+          "whatsapp.pin": "",
+          "whatsapp.phoneNumberId": "",
+          "whatsapp.isOnBizApp": false,
+          "whatsapp.phoneNumbers": [],
+          "whatsapp.wabaId": "",
+          "whatsapp.apiVersion": "",
+          "whatsapp.tokenType": "",
+          "whatsapp.connectedAt": null,
+          "whatsapp.onboardingCompletedAt": null,
+          "whatsapp.messagingBlocked": false,
+          "whatsapp.messagingStatus": "",
+          "whatsapp.messagingBlockedReason": "",
+          "whatsapp.healthCheckedAt": null,
+        },
+      },
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Company not found",
+      });
+    }
+
+    console.log(
+      `[WhatsApp] Disconnected credentials for company ${req.companyId}`,
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "WhatsApp Business Account disconnected",
+    });
+  } catch (error) {
+    console.error(
+      "[WhatsApp] Failed to disconnect WhatsApp:",
+      error,
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to disconnect WhatsApp Business Account",
+    });
+  }
+};
+
+const healthCheckWhatsApp = async (req, res) => {
+  try {
+    const credentials = await getCompanyWhatsAppCredentials(req.companyId);
+
+    if (!credentials?.accessToken || !credentials?.wabaId) {
+      return res.status(400).json({
+        success: false,
+        message: "WhatsApp is not connected for this company yet.",
+      });
+    }
+
+    const health = await checkWabaHealthStatus(
+      credentials.accessToken,
+      credentials.wabaId,
+    );
+
+    const setupStatus = await updateCompanyMessagingHealth(req.companyId, health);
+
+    return res.status(200).json({
+      success: true,
+      canSendMessage: health.canSendMessage,
+      isBlocked: health.isBlocked,
+      hasPaymentIssue: health.hasPaymentIssue,
+      hasPaymentMethod: !health.hasPaymentIssue,
+      needsBusinessVerification: health.needsBusinessVerification,
+      businessId: health.businessId,
+      businessName: health.businessName,
+      reason: health.reason,
+      setupStatus,
+    });
+  } catch (error) {
+    console.error(
+      "[WhatsApp] Health check failed:",
+      error.response?.data
+        ? JSON.stringify(error.response.data, null, 2)
+        : error.message,
+    );
+    return res.status(500).json({
+      success: false,
+      message: "Could not check WhatsApp messaging health right now.",
+    });
+  }
+};
+
+// The company's own WhatsApp numbers and which one is the default.
+const getWhatsAppNumbers = async (req, res) => {
+  try {
+    const data = await listCompanyNumbers(req.companyId);
+    res.status(200).json({ success: true, ...data });
+  } catch (error) {
+    console.error("[WhatsApp] Failed to list numbers:", error);
+    res.status(500).json({ success: false, message: "Failed to load WhatsApp numbers" });
+  }
+};
+
+// Pulls this company's numbers from its own WhatsApp Business Account.
+const syncWhatsAppNumbers = async (req, res) => {
+  try {
+    const result = await syncCompanyNumbers(req.companyId);
+    const data = await listCompanyNumbers(req.companyId);
+    res.status(200).json({ success: true, ...data, skippedByPlan: result.skippedByPlan });
+  } catch (error) {
+    console.error("[WhatsApp] Failed to sync numbers:", error.response?.data || error.message);
+    res.status(error.statusCode || 502).json({
+      success: false,
+      message: error.statusCode ? error.message : "Could not fetch your numbers from WhatsApp right now.",
+    });
+  }
+};
+
+const setDefaultWhatsAppNumber = async (req, res) => {
+  try {
+    const { phoneNumberId } = req.body || {};
+    if (!phoneNumberId) {
+      return res.status(400).json({ success: false, message: "phoneNumberId is required" });
+    }
+
+    await setDefaultNumber(req.companyId, phoneNumberId);
+    const data = await listCompanyNumbers(req.companyId);
+    res.status(200).json({ success: true, ...data });
+  } catch (error) {
+    if (!error.statusCode) console.error("[WhatsApp] Failed to set default number:", error);
+    res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.statusCode ? error.message : "Failed to change the default number",
+    });
+  }
+};
+
+const getQuickReplies = async (req, res) => {
+  try {
+    const company = await Company.findById(req.companyId).select("quickReplies").lean();
+    res.status(200).json({ success: true, quickReplies: company?.quickReplies || [] });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ success: false, message: "Couldn't load quick replies" });
+  }
+};
+
+// Replaces the whole list — the inbox edits it as one small list.
+const saveQuickReplies = async (req, res) => {
+  try {
+    const list = Array.isArray(req.body.quickReplies) ? req.body.quickReplies : [];
+    const cleaned = list
+      .map((r) => ({
+        shortcut: String(r.shortcut || "").trim().replace(/^\//, "").slice(0, 30),
+        text: String(r.text || "").trim().slice(0, 1000),
+      }))
+      .filter((r) => r.shortcut && r.text)
+      .slice(0, 100);
+    const company = await Company.findByIdAndUpdate(
+      req.companyId,
+      { quickReplies: cleaned },
+      { new: true },
+    ).select("quickReplies");
+    res.status(200).json({ success: true, quickReplies: company?.quickReplies || [] });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ success: false, message: "Couldn't save quick replies" });
+  }
+};
+
+module.exports = {
+  getQuickReplies,
+  saveQuickReplies,
+  getWhatsAppNumbers,
+  syncWhatsAppNumbers,
+  setDefaultWhatsAppNumber,
+  getWhatsAppStatus,
+  getCompanySetupStatus,
+  connectWhatsApp,
+  disconnectWhatsApp,
+  healthCheckWhatsApp,
+};

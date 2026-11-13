@@ -1,0 +1,515 @@
+import { useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import {
+  LifeBuoy,
+  Check,
+  ChevronDown,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  LogOut,
+  Plug,
+} from "lucide-react";
+import { cn } from "../../utils/cn";
+import useAuthStore from "../../store/authStore";
+import usePlan from "../../hooks/usePlan";
+import { LogoMark } from "../ui/Logo";
+import useWhatsAppNumbersStore, { numberLabel } from "../../store/whatsappNumbersStore";
+import { toast } from "react-hot-toast";
+import { supportEmailUrl, supportWhatsAppUrl } from "../../utils/support";
+import {
+  ROLE_LABELS,
+  getHomePathForRole,
+  getNavGroupsForRole,
+  isItemActive,
+} from "./navConfig";
+
+function NavTooltip({ label }) {
+  return (
+    <span className="pointer-events-none absolute left-[calc(100%+12px)] top-1/2 z-50 -translate-y-1/2 whitespace-nowrap rounded-md bg-ink px-2.5 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100">
+      {label}
+    </span>
+  );
+}
+
+// Shows which WhatsApp number messages are sent from. With several numbers,
+// an admin can switch the default right here; other roles just see it.
+function SendingNumber({ collapsed }) {
+  const user = useAuthStore((s) => s.user);
+  const numbers = useWhatsAppNumbersStore((s) => s.numbers);
+  const defaultId = useWhatsAppNumbersStore((s) => s.defaultPhoneNumberId);
+  const load = useWhatsAppNumbersStore((s) => s.load);
+  const setDefault = useWhatsAppNumbersStore((s) => s.setDefault);
+  const [open, setOpen] = useState(false);
+  const [switching, setSwitching] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDown = (event) => {
+      if (ref.current && !ref.current.contains(event.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [open]);
+
+  const current = numbers.find((n) => n.phoneNumberId === defaultId);
+  const label = current ? numberLabel(current) : "";
+  const canSwitch = user?.role === "ADMIN" && numbers.length > 1;
+
+  async function choose(number) {
+    if (number.phoneNumberId === defaultId) return setOpen(false);
+    try {
+      setSwitching(true);
+      await setDefault(number.phoneNumberId);
+      toast.success(`Now sending from ${numberLabel(number)}`);
+      setOpen(false);
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Could not change the number");
+    } finally {
+      setSwitching(false);
+    }
+  }
+
+  const status = label ? `Sending from ${label}` : "WhatsApp connected";
+
+  if (collapsed) {
+    return (
+      <div ref={ref} className="relative">
+        <button
+          type="button"
+          onClick={() => canSwitch && setOpen((v) => !v)}
+          aria-label={status}
+          className="group relative mx-auto flex h-9 w-9 items-center justify-center rounded-lg transition hover:bg-white/10"
+        >
+          <span className="h-2.5 w-2.5 rounded-full bg-accent ring-4 ring-accent/25" />
+          {!open && <NavTooltip label={status} />}
+        </button>
+        {open && (
+          <NumberMenu
+            numbers={numbers}
+            defaultId={defaultId}
+            onChoose={choose}
+            busy={switching}
+            className="left-[calc(100%+12px)] top-0"
+          />
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => canSwitch && setOpen((v) => !v)}
+        aria-haspopup={canSwitch ? "listbox" : undefined}
+        aria-expanded={canSwitch ? open : undefined}
+        className={cn(
+          "flex w-full items-center gap-2.5 rounded-lg border border-white/10 bg-white/10 px-3 py-2 text-left text-white",
+          canSwitch ? "cursor-pointer transition hover:bg-white/15" : "cursor-default",
+        )}
+      >
+        <span className="h-2 w-2 shrink-0 rounded-full bg-accent ring-4 ring-accent/25" />
+        <span className="min-w-0 flex-1">
+          <span className="block text-[12px] text-white/70">{label ? "Sending from" : "WhatsApp"}</span>
+          <span className="block truncate text-[13px] font-semibold tabular-nums">{label || "Connected"}</span>
+        </span>
+        {canSwitch && <ChevronDown size={15} className={cn("shrink-0 transition-transform", open && "rotate-180")} />}
+      </button>
+      {open && (
+        <NumberMenu
+          numbers={numbers}
+          defaultId={defaultId}
+          onChoose={choose}
+          busy={switching}
+          className="left-0 right-0 top-[calc(100%+6px)]"
+        />
+      )}
+    </div>
+  );
+}
+
+function NumberMenu({ numbers, defaultId, onChoose, busy, className }) {
+  return (
+    <div
+      role="listbox"
+      aria-label="Choose the WhatsApp number to send from"
+      className={cn(
+        "absolute z-50 min-w-[220px] rounded-xl border border-line bg-surface p-1.5 text-ink shadow-[var(--shadow-pop)]",
+        className,
+      )}
+    >
+      <p className="px-3 pb-1 pt-1.5 text-[13px] font-medium text-ink-subtle">Send new messages from</p>
+      {numbers.map((number) => {
+        const active = number.phoneNumberId === defaultId;
+        const ready = !number.status || number.status === "CONNECTED";
+        return (
+          <button
+            key={number.phoneNumberId}
+            type="button"
+            role="option"
+            aria-selected={active}
+            disabled={busy || (!ready && !active)}
+            onClick={() => onChoose(number)}
+            className={cn(
+              "flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-[14px] transition disabled:opacity-50",
+              active ? "bg-brand-50 font-medium text-brand-900" : "text-ink hover:bg-canvas",
+            )}
+          >
+            <span className="min-w-0 flex-1">
+              <span className="block truncate tabular-nums">{numberLabel(number)}</span>
+              {number.verifiedName && (
+                <span className="block truncate text-[12px] text-ink-muted">{number.verifiedName}</span>
+              )}
+            </span>
+            {active && <Check size={16} className="shrink-0 text-brand-700" />}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function WhatsAppStatus({ collapsed, onConnect }) {
+  const setupStatus = useAuthStore((s) => s.setupStatus);
+
+  if (setupStatus === "READY") {
+    return <SendingNumber collapsed={collapsed} />;
+  }
+
+  if (setupStatus === "WHATSAPP_ONBOARDING_REQUIRED") {
+    return (
+      <button
+        type="button"
+        onClick={onConnect}
+        className={cn(
+          "group relative flex items-center gap-2 rounded-lg bg-accent text-[13px] font-semibold text-brand-900 transition hover:bg-[#b9e650]",
+          collapsed ? "mx-auto h-9 w-9 justify-center" : "w-full px-3 py-2",
+        )}
+      >
+        <Plug size={15} />
+        {!collapsed && "Connect WhatsApp"}
+        {collapsed && <NavTooltip label="Connect WhatsApp" />}
+      </button>
+    );
+  }
+
+  return null;
+}
+
+// "Chat with us on WhatsApp" — shown only when a support contact is set
+// (VITE_SUPPORT_WHATSAPP / VITE_SUPPORT_EMAIL, see utils/support.js).
+function HelpLink({ collapsed }) {
+  const href = supportWhatsAppUrl() || supportEmailUrl;
+  if (!href) return null;
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      className={cn(
+        "group relative flex items-center gap-2.5 rounded-lg text-[14px] font-medium text-white/70 transition-colors hover:bg-white/10 hover:text-white",
+        collapsed ? "mx-auto h-9 w-9 justify-center" : "w-full px-3 py-2",
+      )}
+    >
+      <LifeBuoy size={16} />
+      {!collapsed && (supportWhatsAppUrl() ? "Help: chat with us on WhatsApp" : "Help: email support")}
+      {collapsed && <NavTooltip label="Help & support" />}
+    </a>
+  );
+}
+
+function PlanCard({ onUpgrade }) {
+  const { plan, getUsage, getLimit } = usePlan();
+  if (!plan) return null;
+
+  const used = getUsage("contacts");
+  const limit = getLimit("contacts");
+  const unlimited = limit === -1 || limit >= 999999;
+  const percent = unlimited || !limit ? 0 : Math.min(Math.round((used / limit) * 100), 100);
+
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/[0.07] p-3.5">
+      <div className="flex items-center justify-between gap-2">
+        <p className="truncate text-[14px] font-semibold text-white">{plan.name || "Your plan"}</p>
+        <button
+          type="button"
+          onClick={onUpgrade}
+          className="text-[13px] font-semibold text-accent hover:underline"
+        >
+          Upgrade
+        </button>
+      </div>
+      <p className="mt-1.5 text-[13px] text-white/70 tabular-nums">
+        {used.toLocaleString()} of {unlimited ? "unlimited" : limit.toLocaleString()} contacts
+      </p>
+      {!unlimited && (
+        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/15">
+          <div
+            className={cn("h-full rounded-full", percent >= 90 ? "bg-[#ff8a80]" : "bg-accent")}
+            style={{ width: `${percent}%` }}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function UserMenu({ collapsed }) {
+  const navigate = useNavigate();
+  const user = useAuthStore((s) => s.user);
+  const logout = useAuthStore((s) => s.logout);
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDown = (event) => {
+      if (ref.current && !ref.current.contains(event.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [open]);
+
+  const initial = user?.name?.charAt(0)?.toUpperCase() || "U";
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        aria-label="Open account menu"
+        className={cn(
+          "flex w-full items-center gap-3 rounded-lg transition hover:bg-white/10",
+          collapsed ? "justify-center p-1.5" : "p-2",
+        )}
+      >
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent text-[14px] font-semibold text-brand-900">
+          {initial}
+        </span>
+        {!collapsed && (
+          <span className="min-w-0 flex-1 text-left">
+            <span className="block truncate text-[14px] font-medium text-white">{user?.name || "User"}</span>
+            <span className="block truncate text-[13px] text-white/65">
+              {ROLE_LABELS[user?.role] || user?.role}
+            </span>
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <div
+          className={cn(
+            "absolute z-50 w-64 rounded-xl border border-line bg-surface p-1.5 text-ink shadow-[var(--shadow-pop)]",
+            collapsed ? "bottom-0 left-[calc(100%+12px)]" : "bottom-[calc(100%+8px)] left-0",
+          )}
+        >
+          <div className="border-b border-line px-3 pb-3 pt-2">
+            <p className="truncate text-[14px] font-medium">{user?.name}</p>
+            <p className="truncate text-[13px] text-ink-muted">{user?.email}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              logout();
+              navigate("/login");
+            }}
+            className="mt-1 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-[14px] text-danger transition hover:bg-danger-soft"
+          >
+            <LogOut size={16} />
+            Log out
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Sidebar contents shared by the desktop rail and the mobile drawer.
+ * `collapsed` only applies on desktop; `onNavigate` lets the drawer close.
+ */
+export default function SidebarPanel({ collapsed = false, onToggleCollapse, onNavigate, headerAction }) {
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const user = useAuthStore((s) => s.user);
+  const groups = getNavGroupsForRole(user?.role);
+  const panelRef = useRef(null);
+
+  // Expanded mode: submenus open inline (the active one opens by default).
+  // Collapsed mode: submenus open as a flyout next to the rail.
+  const [openMenus, setOpenMenus] = useState(() => {
+    const initial = {};
+    groups.forEach((group) =>
+      group.items.forEach((item) => {
+        if (item.submenu && isItemActive(item, pathname)) initial[item.id] = true;
+      }),
+    );
+    return initial;
+  });
+  const [flyout, setFlyout] = useState(null);
+
+  useEffect(() => {
+    if (!flyout) return undefined;
+    const onDown = (event) => {
+      if (panelRef.current && !panelRef.current.contains(event.target)) setFlyout(null);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [flyout]);
+
+  const go = (path) => {
+    setFlyout(null);
+    navigate(path);
+    onNavigate?.();
+  };
+
+  return (
+    <div ref={panelRef} className="flex h-full flex-col bg-brand-900 text-white">
+      <div className={cn("flex h-16 items-center", collapsed ? "justify-center px-3" : "justify-between px-5")}>
+        <button
+          type="button"
+          onClick={() => go(getHomePathForRole(user?.role))}
+          className="flex items-center gap-2.5"
+          aria-label="Go to home"
+        >
+          <LogoMark className="h-8 w-8" />
+          {!collapsed && <span className="text-[18px] font-semibold tracking-[-0.02em] text-white">SpearTick</span>}
+        </button>
+        {headerAction}
+      </div>
+
+      <div className={cn("pb-1", collapsed ? "px-3" : "px-4")}>
+        <WhatsAppStatus collapsed={collapsed} onConnect={() => go("/onboarding/whatsapp")} />
+      </div>
+
+      {/* No scroll container when collapsed: overflow would clip the flyouts/tooltips. */}
+      <nav className={cn("min-h-0 flex-1 pb-4", collapsed ? "px-3" : "overflow-y-auto px-4 scrollbar-hide")}>
+        {groups.map((group) => (
+          <div key={group.label} className="mt-5">
+            {collapsed ? (
+              <div className="mx-auto mb-2 h-px w-6 bg-white/20" />
+            ) : (
+              <p className="mb-1 px-3 text-[13px] font-medium text-white/55">{group.label}</p>
+            )}
+
+            <ul className="space-y-0.5">
+              {group.items.map((item) => {
+                const Icon = item.icon;
+                const active = isItemActive(item, pathname);
+                const menuOpen = collapsed ? flyout === item.id : !!openMenus[item.id];
+
+                return (
+                  <li key={item.id} className="relative">
+                    <button
+                      type="button"
+                      aria-label={item.label}
+                      aria-expanded={item.submenu ? menuOpen : undefined}
+                      onClick={() => {
+                        if (!item.submenu) return go(item.path);
+                        if (collapsed) return setFlyout((current) => (current === item.id ? null : item.id));
+                        setOpenMenus((current) => ({ ...current, [item.id]: !current[item.id] }));
+                      }}
+                      className={cn(
+                        "group relative flex w-full items-center rounded-lg text-[15px] font-medium transition-[background-color,color,padding] duration-150",
+                        collapsed ? "h-10 justify-center" : "h-10 gap-3 px-3",
+                        active ? "bg-white/[0.13] text-white" : "text-white/75 hover:bg-white/[0.08] hover:text-white",
+                      )}
+                    >
+                      {active && (
+                        <span className="slide-in absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-accent" />
+                      )}
+                      <Icon size={18} strokeWidth={active ? 2.2 : 1.9} className={active ? "text-accent" : "text-white/60"} />
+                      {!collapsed && <span className="flex-1 text-left">{item.label}</span>}
+                      {!collapsed && item.submenu && (
+                        <ChevronDown
+                          size={16}
+                          className={cn("text-white/50 transition-transform", menuOpen && "rotate-180")}
+                        />
+                      )}
+                      {collapsed && !menuOpen && <NavTooltip label={item.label} />}
+                    </button>
+
+                    {item.submenu && menuOpen && !collapsed && (
+                      <ul className="mb-1 ml-[21px] mt-0.5 space-y-0.5 border-l border-white/15 pl-3">
+                        {item.submenu.map((sub) => {
+                          const subActive = pathname === sub.path;
+                          return (
+                            <li key={sub.path}>
+                              <button
+                                type="button"
+                                onClick={() => go(sub.path)}
+                                className={cn(
+                                  "flex h-9 w-full items-center rounded-md px-3 text-left text-[14px] transition-colors",
+                                  subActive
+                                    ? "font-medium text-white"
+                                    : "text-white/65 hover:bg-white/[0.08] hover:text-white",
+                                )}
+                              >
+                                {subActive && <span className="-ml-[17px] mr-[13px] h-4 w-0.5 rounded-full bg-accent" />}
+                                {sub.label}
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+
+                    {item.submenu && menuOpen && collapsed && (
+                      <div className="absolute left-[calc(100%+12px)] top-0 z-50 w-60 rounded-xl border border-line bg-surface p-1.5 text-ink shadow-[var(--shadow-pop)]">
+                        <p className="px-3 pb-1 pt-1.5 text-[13px] font-medium text-ink-subtle">{item.label}</p>
+                        {item.submenu.map((sub) => {
+                          const SubIcon = sub.icon || ChevronRight;
+                          const subActive = pathname === sub.path;
+                          return (
+                            <button
+                              key={sub.path}
+                              type="button"
+                              onClick={() => go(sub.path)}
+                              className={cn(
+                                "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-[14px] transition",
+                                subActive ? "bg-brand-50 font-medium text-brand-900" : "text-ink hover:bg-canvas",
+                              )}
+                            >
+                              <SubIcon size={16} className={subActive ? "text-brand-700" : "text-ink-muted"} />
+                              {sub.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
+      </nav>
+
+      <div className={cn("space-y-2 border-t border-white/10 py-3", collapsed ? "px-3" : "px-4")}>
+        {!collapsed && user?.role === "ADMIN" && <PlanCard onUpgrade={() => go("/billing")} />}
+        <HelpLink collapsed={collapsed} />
+        <UserMenu collapsed={collapsed} />
+        {onToggleCollapse && (
+          <button
+            type="button"
+            onClick={onToggleCollapse}
+            className={cn(
+              "flex h-9 w-full items-center gap-2 rounded-lg text-[13px] text-white/60 transition hover:bg-white/10 hover:text-white",
+              collapsed ? "justify-center" : "px-3",
+            )}
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          >
+            {collapsed ? <ChevronsRight size={16} /> : <ChevronsLeft size={16} />}
+            {!collapsed && "Collapse sidebar"}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}

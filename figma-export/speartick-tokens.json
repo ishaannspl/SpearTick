@@ -1,0 +1,59 @@
+{
+  "$schema": "https://design-tokens.github.io/community-group/format/",
+  "name": "SpearTick",
+  "color": {
+    "brand": {
+      "50": { "$type": "color", "$value": "#eefbf4" },
+      "100": { "$type": "color", "$value": "#ddf5e8" },
+      "200": { "$type": "color", "$value": "#b7eacf" },
+      "300": { "$type": "color", "$value": "#85d8af" },
+      "400": { "$type": "color", "$value": "#4cbf89" },
+      "500": { "$type": "color", "$value": "#22a46d" },
+      "600": { "$type": "color", "$value": "#128c5e" },
+      "700": { "$type": "color", "$value": "#0f704d" },
+      "800": { "$type": "color", "$value": "#0e5940" },
+      "900": { "$type": "color", "$value": "#0b3b2e" },
+      "950": { "$type": "color", "$value": "#062219" }
+    },
+    "canvas": { "$type": "color", "$value": "#f6f7f6" },
+    "surface": { "$type": "color", "$value": "#ffffff" },
+    "line": { "$type": "color", "$value": "#e6e8e3" },
+    "line-strong": { "$type": "color", "$value": "#d3d7cf" },
+    "ink": { "$type": "color", "$value": "#0f1c17" },
+    "ink-muted": { "$type": "color", "$value": "#4c5953" },
+    "ink-subtle": { "$type": "color", "$value": "#66716c" },
+    "accent": { "$type": "color", "$value": "#c8f169" },
+    "success": { "$type": "color", "$value": "#128c5e" },
+    "success-soft": { "$type": "color", "$value": "#ddf5e8" },
+    "warning": { "$type": "color", "$value": "#b45309" },
+    "warning-soft": { "$type": "color", "$value": "#fef3c7" },
+    "danger": { "$type": "color", "$value": "#c62828" },
+    "danger-soft": { "$type": "color", "$value": "#fdecec" },
+    "info": { "$type": "color", "$value": "#1d5fd1" },
+    "info-soft": { "$type": "color", "$value": "#e7efff" }
+  },
+  "font": {
+    "family": { "$type": "fontFamily", "$value": "Geist" },
+    "marketing-heading": { "$type": "fontFamily", "$value": "General Sans" },
+    "marketing-body": { "$type": "fontFamily", "$value": "Inter" },
+    "size": {
+      "12": { "$type": "dimension", "$value": "12px" },
+      "13": { "$type": "dimension", "$value": "13px" },
+      "14": { "$type": "dimension", "$value": "14px" },
+      "15": { "$type": "dimension", "$value": "15px" },
+      "17": { "$type": "dimension", "$value": "17px" },
+      "28": { "$type": "dimension", "$value": "28px" },
+      "30": { "$type": "dimension", "$value": "30px" },
+      "32": { "$type": "dimension", "$value": "32px" }
+    }
+  },
+  "radius": {
+    "card": { "$type": "dimension", "$value": "14px" },
+    "input": { "$type": "dimension", "$value": "10px" },
+    "pill": { "$type": "dimension", "$value": "999px" }
+  },
+  "shadow": {
+    "card": { "$type": "shadow", "$value": { "color": "#0b3b2e0d", "offsetX": "0px", "offsetY": "2px", "blur": "6px", "spread": "0px" } },
+    "pop": { "$type": "shadow", "$value": { "color": "#0b3b2e47", "offsetX": "0px", "offsetY": "24px", "blur": "56px", "spread": "-16px" } }
+  }
+}
