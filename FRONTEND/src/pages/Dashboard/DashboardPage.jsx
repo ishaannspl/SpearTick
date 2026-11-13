@@ -119,9 +119,16 @@ function Empty({ icon: Icon = Megaphone, title, description, action }) {
   );
 }
 
-function PeriodPicker({ value, onChange }) {
+function PeriodPicker({ value, onChange, onDark = false }) {
   return (
-    <div role="tablist" aria-label="Time period" className="inline-flex rounded-lg border border-line bg-surface p-1">
+    <div
+      role="tablist"
+      aria-label="Time period"
+      className={cn(
+        "inline-flex max-w-full overflow-x-auto rounded-lg border p-1",
+        onDark ? "border-white/20 bg-white/10" : "border-line bg-surface",
+      )}
+    >
       {FILTERS.map((item) => {
         const active = value === item.value;
         return (
@@ -133,7 +140,13 @@ function PeriodPicker({ value, onChange }) {
             onClick={() => onChange(item.value)}
             className={cn(
               "h-8 whitespace-nowrap rounded-md px-3 text-[14px] font-medium transition-colors",
-              active ? "bg-brand-900 text-white" : "text-ink-muted hover:bg-canvas hover:text-ink",
+              active
+                ? onDark
+                  ? "bg-white text-brand-900"
+                  : "bg-brand-900 text-white"
+                : onDark
+                  ? "text-white/80 hover:bg-white/10 hover:text-white"
+                  : "text-ink-muted hover:bg-canvas hover:text-ink",
             )}
           >
             {item.label}
@@ -144,33 +157,38 @@ function PeriodPicker({ value, onChange }) {
   );
 }
 
-function KpiCard({ label, value, caption, icon: Icon, onClick, tone = "default" }) {
+const KPI_TONES = {
+  green: { card: "bg-[#ddf5e8] border-[#c3ebd5]", icon: "text-[#128c5e]" },
+  blue: { card: "bg-[#e3f0fb] border-[#c9e1f5]", icon: "text-[#1d6fb8]" },
+  amber: { card: "bg-[#fff1d6] border-[#fbe2ae]", icon: "text-[#b7791f]" },
+  red: { card: "bg-danger-soft border-[#f3cccc]", icon: "text-danger" },
+  neutral: { card: "bg-surface border-line", icon: "text-brand-600" },
+};
+
+function KpiCard({ label, value, caption, icon: Icon, onClick, tone = "neutral" }) {
   const Tag = onClick ? "button" : "div";
+  const colors = KPI_TONES[tone] || KPI_TONES.neutral;
   return (
     <Tag
       type={onClick ? "button" : undefined}
       onClick={onClick}
       className={cn(
-        "lift group flex flex-col rounded-[var(--radius-card)] border border-line bg-surface p-5 text-left shadow-[var(--shadow-card)]",
+        "lift group flex flex-col rounded-[var(--radius-card)] border p-5 text-left shadow-[var(--shadow-card)]",
+        colors.card,
       )}
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="flex items-center gap-2 text-[14px] font-medium text-ink-muted">
-          <Icon size={16} className={tone === "danger" ? "text-danger" : "text-brand-600"} />
+        <span className="flex items-center gap-2.5 text-[14px] font-medium text-ink-muted">
+          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white shadow-sm">
+            <Icon size={16} className={colors.icon} />
+          </span>
           {label}
         </span>
         {onClick && (
           <ArrowRight size={16} className="text-ink-subtle transition group-hover:translate-x-0.5 group-hover:text-ink" />
         )}
       </div>
-      <p
-        className={cn(
-          "mt-4 text-[32px] font-semibold leading-none tracking-[-0.02em] tabular-nums",
-          tone === "danger" ? "text-danger" : "text-ink",
-        )}
-      >
-        {value}
-      </p>
+      <p className="mt-4 text-[32px] font-semibold leading-none tracking-[-0.02em] text-ink tabular-nums">{value}</p>
       <p className="mt-2 text-[13px] text-ink-muted">{caption}</p>
     </Tag>
   );
@@ -222,6 +240,13 @@ function CountList({ items, labelKey, capitalize = false }) {
     </ul>
   );
 }
+
+const SHORTCUTS = [
+  { label: "New campaign", to: "/campaigns/upload", icon: Plus, tone: "green" },
+  { label: "Open inbox", to: "/inbox", icon: MessageSquareText, tone: "blue" },
+  { label: "Campaign history", to: "/campaigns/history", icon: Clock3, tone: "amber" },
+  { label: "Settings", to: "/settings", icon: Wallet, tone: "neutral" },
+];
 
 /* ── Page ──────────────────────────────────────────────────────────── */
 
@@ -392,29 +417,42 @@ function DashboardPage() {
   const firstName = user?.name?.split(" ")[0];
 
   const header = (
-    <div className="mb-8 flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
-      <div>
-        <h1 className="text-[28px] font-semibold tracking-[-0.025em] text-ink sm:text-[32px]">
-          {greeting()}
-          {firstName ? `, ${firstName}` : ""}
-        </h1>
-        <p className="mt-1.5 text-[16px] text-ink-muted">Here's how your WhatsApp campaigns are doing.</p>
-      </div>
-      <div className="flex flex-wrap items-center gap-2.5">
-        <PeriodPicker value={filter} onChange={setFilter} />
-        <Button
-          variant="secondary"
-          size="icon"
-          onClick={() => Promise.all([fetchAccountHealth(true), fetchDashboard()])}
-          disabled={refreshing}
-          aria-label="Refresh dashboard"
-          title="Refresh dashboard"
-        >
-          <RefreshCw size={16} className={cn(refreshing && "animate-spin")} />
-        </Button>
-        <Button leftIcon={Plus} onClick={() => navigate("/campaigns/upload")}>
-          New campaign
-        </Button>
+    <div className="mb-6 overflow-hidden rounded-2xl bg-[#128c5e] p-6 text-white shadow-[var(--shadow-card)] sm:p-7">
+      <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-[28px] font-semibold tracking-[-0.025em] sm:text-[32px]">
+            {greeting()}
+            {firstName ? `, ${firstName}` : ""}
+          </h1>
+          <p className="mt-1.5 text-[16px] text-white/80">
+            {stats.running > 0
+              ? `${stats.running} ${stats.running === 1 ? "campaign is" : "campaigns are"} sending right now.`
+              : stats.failed > 0
+                ? `${stats.failed} ${stats.failed === 1 ? "message needs" : "messages need"} your attention.`
+                : "Here's how your WhatsApp campaigns are doing."}
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <PeriodPicker value={filter} onChange={setFilter} onDark />
+          <button
+            type="button"
+            onClick={() => Promise.all([fetchAccountHealth(true), fetchDashboard()])}
+            disabled={refreshing}
+            aria-label="Refresh dashboard"
+            title="Refresh dashboard"
+            className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/20 bg-white/10 text-white transition hover:bg-white/20 disabled:opacity-60"
+          >
+            <RefreshCw size={16} className={cn(refreshing && "animate-spin")} />
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate("/campaigns/upload")}
+            className="inline-flex h-10 items-center gap-2 rounded-lg bg-accent px-4 text-[15px] font-semibold text-brand-900 transition hover:bg-[#b9e650]"
+          >
+            <Plus size={17} />
+            New campaign
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -454,33 +492,16 @@ function DashboardPage() {
           />
         )}
 
-        {/* ── Account status ── */}
-        <Card padded={false} className="grid grid-cols-2 lg:grid-cols-4 lg:divide-x lg:divide-line [&>*:nth-child(-n+2)]:border-b [&>*:nth-child(-n+2)]:border-line lg:[&>*:nth-child(-n+2)]:border-b-0">
-          <div className="flex items-center gap-3 px-5 py-4">
-            <span className="live-dot flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-50 text-brand-700">
-              <CheckCircle2 size={20} />
-            </span>
-            <div className="min-w-0">
-              <p className="text-[13px] text-ink-muted">WhatsApp</p>
-              <p className="text-[16px] font-semibold text-ink">Connected</p>
-            </div>
-          </div>
-          <AccountFact label="Quality rating" value={qualityLabel} />
-          <AccountFact label="Messaging limit" value={tierLabel} />
-          <AccountFact
-            label="Campaigns in progress"
-            value={`${stats.running} running`}
-            hint={`${stats.scheduled} scheduled`}
-          />
-        </Card>
-
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="min-w-0 space-y-5">
         {/* ── Key numbers ── */}
-        <section className="stagger grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
+        <section className="stagger grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <KpiCard
             label="Campaigns"
             value={<AnimatedNumber value={stats.totalCampaigns} />}
             caption={`Created in the last ${periodLabel}`}
             icon={Megaphone}
+            tone="green"
             onClick={() => navigate("/campaigns/history")}
           />
           <KpiCard
@@ -488,32 +509,35 @@ function DashboardPage() {
             value={<AnimatedNumber value={stats.delivered} format={formatNumber} />}
             caption={`${stats.successRate}% of attempted messages`}
             icon={Send}
+            tone="blue"
           />
           <KpiCard
             label="People reached"
             value={<AnimatedNumber value={stats.audience} format={formatNumber} />}
             caption="Unique contacts messaged"
             icon={Users}
+            tone="green"
           />
           <KpiCard
             label="Failed"
             value={<AnimatedNumber value={stats.failed} format={formatNumber} />}
             caption={`${stats.failureRate}% of all sends`}
             icon={XCircle}
-            tone={stats.failed > 0 ? "danger" : "default"}
+            tone={stats.failed > 0 ? "red" : "neutral"}
           />
           <KpiCard
             label="WhatsApp spend"
             value={spendValue}
             caption={filter === "all" ? "Billed by Meta, last 365 days" : "Billed by Meta"}
             icon={Wallet}
+            tone="amber"
           />
         </section>
 
         {/* ── Charts ── */}
-        <section className="grid gap-5 xl:grid-cols-3">
+        <section className="grid gap-5 lg:grid-cols-3">
           <SectionCard
-            className="xl:col-span-2"
+            className="lg:col-span-2"
             title="Messages delivered"
             description="Delivered messages by the day each campaign was created"
           >
@@ -617,9 +641,9 @@ function DashboardPage() {
         </section>
 
         {/* ── Recent campaigns + attention ── */}
-        <section className="grid gap-5 xl:grid-cols-3">
+        <section className="grid gap-5 lg:grid-cols-3">
           <SectionCard
-            className="xl:col-span-2"
+            className="lg:col-span-2"
             title="Recent campaigns"
             action={
               <button
@@ -730,7 +754,7 @@ function DashboardPage() {
         </section>
 
         {/* ── Breakdown ── */}
-        <section className="grid gap-5 lg:grid-cols-2 xl:grid-cols-3">
+        <section className="grid gap-5 lg:grid-cols-2">
           <SectionCard title="Campaign types" description={`Campaigns from the last ${periodLabel}`}>
             {typeData.length ? (
               <CountList items={typeData} labelKey="type" />
@@ -773,6 +797,53 @@ function DashboardPage() {
             </SectionCard>
           )}
         </section>
+        </div>
+
+        {/* ── Right-hand column ── */}
+        <aside className="min-w-0 space-y-5">
+          <Card padded={false}>
+            <div className="flex items-center gap-3 border-b border-line px-5 py-4">
+              <span className="live-dot flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-50 text-brand-700">
+                <CheckCircle2 size={20} />
+              </span>
+              <div className="min-w-0">
+                <p className="text-[13px] text-ink-muted">WhatsApp</p>
+                <p className="text-[16px] font-semibold text-ink">Connected</p>
+              </div>
+            </div>
+            <div className="divide-y divide-line">
+              <AccountFact label="Quality rating" value={qualityLabel} />
+              <AccountFact label="Messaging limit" value={tierLabel} />
+              <AccountFact
+                label="Campaigns in progress"
+                value={`${stats.running} running`}
+                hint={`${stats.scheduled} scheduled`}
+              />
+            </div>
+          </Card>
+
+          <SectionCard title="Quick shortcuts">
+            <div className="grid grid-cols-2 gap-3">
+              {SHORTCUTS.map((item) => (
+                <button
+                  key={item.label}
+                  type="button"
+                  onClick={() => navigate(item.to)}
+                  className={cn(
+                    "lift flex flex-col items-start gap-2.5 rounded-xl border p-3.5 text-left text-[14px] font-semibold text-ink",
+                    KPI_TONES[item.tone].card,
+                  )}
+                >
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white shadow-sm">
+                    <item.icon size={16} className={KPI_TONES[item.tone].icon} />
+                  </span>
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </SectionCard>
+        </aside>
+        </div>
       </div>
     </DashboardLayout>
   );
